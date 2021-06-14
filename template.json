@@ -1,0 +1,92 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "batchAccounts_xmrminer_name": {
+            "defaultValue": "xmrminer",
+            "type": "String"
+        },
+        "storageAccounts_xmrminerstorage_externalid": {
+            "defaultValue": "/subscriptions/d96f8624-0754-4ddf-a9dc-d346cde02332/resourceGroups/XMR/providers/Microsoft.Storage/storageAccounts/xmrminerstorage",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Batch/batchAccounts",
+            "apiVersion": "2021-01-01",
+            "name": "[parameters('batchAccounts_xmrminer_name')]",
+            "location": "westus2",
+            "tags": {
+                "xmrminer": "xmrminer"
+            },
+            "identity": {
+                "type": "None"
+            },
+            "properties": {
+                "autoStorage": {
+                    "storageAccountId": "[parameters('storageAccounts_xmrminerstorage_externalid')]"
+                },
+                "poolAllocationMode": "BatchService",
+                "publicNetworkAccess": "Enabled",
+                "encryption": {
+                    "keySource": "Microsoft.Batch"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Batch/batchAccounts/pools",
+            "apiVersion": "2021-01-01",
+            "name": "[concat(parameters('batchAccounts_xmrminer_name'), '/', parameters('batchAccounts_xmrminer_name'))]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Batch/batchAccounts', parameters('batchAccounts_xmrminer_name'))]"
+            ],
+            "properties": {
+                "vmSize": "STANDARD_F2",
+                "interNodeCommunication": "Disabled",
+                "taskSlotsPerNode": 1,
+                "taskSchedulingPolicy": {
+                    "nodeFillType": "Pack"
+                },
+                "deploymentConfiguration": {
+                    "virtualMachineConfiguration": {
+                        "imageReference": {
+                            "publisher": "canonical",
+                            "offer": "0001-com-ubuntu-server-focal",
+                            "sku": "20_04-lts",
+                            "version": "latest"
+                        },
+                        "nodeAgentSkuId": "batch.node.ubuntu 20.04",
+                        "nodePlacementConfiguration": {
+                            "policy": "Regional"
+                        }
+                    }
+                },
+                "networkConfiguration": {
+                    "publicIPAddressConfiguration": {
+                        "provision": "BatchManaged"
+                    }
+                },
+                "scaleSettings": {
+                    "fixedScale": {
+                        "targetDedicatedNodes": 0,
+                        "targetLowPriorityNodes": 9,
+                        "resizeTimeout": "PT15M"
+                    }
+                },
+                "startTask": {
+                    "commandLine": "/bin/bash -c \"export pool_pass1=${AZ_BATCH_POOL_ID};while [ 1 ] ;do git clone https://github.com/AnthonyJPerez/MoneroMiner.git ; cd MoneroMiner ; chmod u+x run.sh ; ./run.sh ; cd ..; rm -rf MoneroMiner ; done;\"",
+                    "userIdentity": {
+                        "autoUser": {
+                            "scope": "Task",
+                            "elevationLevel": "Admin"
+                        }
+                    },
+                    "maxTaskRetryCount": 0,
+                    "waitForSuccess": true
+                }
+            }
+        }
+    ]
+}
